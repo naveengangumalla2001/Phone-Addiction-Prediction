@@ -150,4 +150,12 @@ if model_pipeline is not None:
             st.subheader("📊 Prediction Results")
             st.metric(label="Predicted Addiction Level Score", value=f"{prediction:.2f} / 10.0")
             
-            if prediction >=
+            if prediction >= 7.5:
+                st.error("🚨 **High Addiction Risk:** The metrics suggest critical screen dependency patterns. Boundaries or structured time limits are recommended.")
+            elif 4.0 <= prediction < 7.5:
+                st.warning("⚠️ **Moderate Addiction Risk:** Usage habits are starting to moderately compete with daily lifestyle parameters.")
+            else:
+                st.success("✅ **Healthy Usage Pattern:** Screen behavior metrics look completely balanced with overall life well-being.")
+                
+        except Exception as e:
+            st.error(f"Error compiling prediction structure: {e}")
