@@ -16,15 +16,14 @@ st.set_page_config(
 def load_trained_model():
     """
     Loads the trained model pipeline. 
-    Checks for a local fallback file if MLflow artifacts aren't natively stored locally.
+    Points to the correct 'model.pkl' artifact in the project repository.
     """
-    # Replace 'GradientBoosting_final_model.pkl' with whatever your best model file is named
-    model_filename = "GradientBoosting_final_model.pkl" 
+    model_filename = "model.pkl" 
     
     if os.path.exists(model_filename):
         return joblib.load(model_filename)
     else:
-        st.error(f"⚠️ Model file '{model_filename}' not found. Please run your training script first to generate it.")
+        st.error(f"⚠️ Model file '{model_filename}' not found in the current directory. Please make sure model.pkl is pushed to your repository.")
         return None
 
 model_pipeline = load_trained_model()
@@ -40,7 +39,7 @@ st.write("---")
 
 # --- USER INPUT FORM ---
 if model_pipeline is not None:
-    # We use a form to avoid app refreshes on every single user interaction
+    # Form used to prevent the app from refreshing layout on every individual keystroke
     with st.form("prediction_form"):
         st.subheader("👥 Demographic Information")
         col1, col2 = st.columns(2)
@@ -88,17 +87,16 @@ if model_pipeline is not None:
             depression = st.slider("Depression Level", min_value=0, max_value=10, value=3)
 
         # Submit button
-        submit_btn = st.form_submit_with_button_style(
+        submit_btn = st.form_submit_button(
             label="🎯 Calculate Addiction Score", 
             type="primary"
         )
 
     # --- INFERENCE LOGIC ---
     if submit_btn:
-        # Create a dictionary matching exactly the training dataset structure
+        # Create a dictionary structure matching features expected by the preprocessing/model pipeline
         input_data = {
             'Age': age,
-            'Gender': gender,
             'Daily_Usage_Hours': daily_usage,
             'Sleep_Hours': sleep_hours,
             'Interllectual_Performance': intellectual_perf,
@@ -113,54 +111,35 @@ if model_pipeline is not None:
             'Time_on_Social_Media': social_media_time,
             'Time_on_Gaming': gaming_time,
             'Time_on_Education': education_time,
-            'Phone_Usage_Purpose': purpose,
             'Family_Communication': family_communication,
             'Weekend_Usage_Hours': weekend_usage
         }
         
-        # Turn into a single row Dataframe
+        # Turn into a DataFrame row
         input_df = pd.DataFrame([input_data])
         
-        # NOTE: pd.get_dummies happens natively inside your training script. 
-        # But because we used pipeline tracking, Scikit-Learn pipelines require all columns to look EXACTLY 
-        # identical to how X_train looked post-dummies. Let's replicate those expected column structures.
-        
-        # List of categorical dummy columns created during training
-        expected_categorical_dummies = [
-            'Gender_Male', 'Gender_Other',
-            'Phone_Usage_Purpose_Education', 'Phone_Usage_Purpose_Gaming', 
-            'Phone_Usage_Purpose_Other', 'Phone_Usage_Purpose_Social Media'
-        ]
-        
-        # Process the frontend single row inputs into structural One-Hot column encodings
+        # Reconstruct the categorical one-hot encoded columns exactly as seen by the model during pipeline training
         input_df['Gender_Male'] = 1 if gender == "Male" else 0
         input_df['Gender_Other'] = 1 if gender == "Other" else 0
         
         input_df['Phone_Usage_Purpose_Education'] = 1 if purpose == "Education" else 0
         input_df['Phone_Usage_Purpose_Gaming'] = 1 if purpose == "Gaming" else 0
-        input_df['Phone_Usage_Purpose_Social Media'] = 1 if purpose == "Social Media" else 0
         input_df['Phone_Usage_Purpose_Other'] = 1 if purpose == "Other" else 0
+        input_df['Phone_Usage_Purpose_Social Media'] = 1 if purpose == "Social Media" else 0
         
-        # Safely drop old string tracking columns
-        input_df = input_df.drop(columns=['Gender', 'Phone_Usage_Purpose'])
+        # Ensure the column sequence mirrors what the model's pipeline structure requires
+        expected_column_order = [
+            'Age', 'Daily_Usage_Hours', 'Sleep_Hours', 'Interllectual_Performance',
+            'Social_Interactions', 'Exercise_Hours', 'Anxiety_Level',
+            'Depression_Level', 'Self_Esteem', 'Screen_Time_Before_Bed',
+            'Phone_Checks_Per_Day', 'Apps_Used_Daily', 'Time_on_Social_Media',
+            'Time_on_Gaming', 'Time_on_Education', 'Family_Communication',
+            'Weekend_Usage_Hours', 'Gender_Male', 'Gender_Other',
+            'Phone_Usage_Purpose_Education', 'Phone_Usage_Purpose_Gaming',
+            'Phone_Usage_Purpose_Other', 'Phone_Usage_Purpose_Social Media'
+        ]
+        
+        input_df = input_df[expected_column_order]
         
         try:
             # Predict using the loaded final scikit-learn pipeline
-            prediction = model_pipeline.predict(input_df)[0]
-            
-            # Show customized diagnostic results
-            st.write("---")
-            st.subheader("📊 Prediction Results")
-            
-            # Format display with a color metric alert block
-            st.metric(label="Predicted Addiction Level Score", value=f"{prediction:.2f} / 10.0")
-            
-            if prediction >= 7.5:
-                st.error("🚨 **High Addiction Risk:** The metric suggests a critical dependence pattern. Interventions or screen limits are strongly recommended.")
-            elif 4.0 <= prediction < 7.5:
-                st.warning("⚠️ **Moderate Addiction Risk:** Normal daily habits starting to encroach upon regular well-being parameters.")
-            else:
-                st.success("✅ **Healthy Usage Pattern:** Screen configurations appear completely balanced with real-world health parameters.")
-                
-        except Exception as e:
-            st.error(f"Error compiling prediction structure: {e}")
