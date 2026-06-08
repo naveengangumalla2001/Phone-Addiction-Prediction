@@ -143,3 +143,11 @@ if model_pipeline is not None:
         
         try:
             # Predict using the loaded final scikit-learn pipeline
+            prediction = model_pipeline.predict(input_df)[0]
+            
+            # Show diagnostic alert outputs
+            st.write("---")
+            st.subheader("📊 Prediction Results")
+            st.metric(label="Predicted Addiction Level Score", value=f"{prediction:.2f} / 10.0")
+            
+            if prediction >=
