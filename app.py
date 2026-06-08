@@ -143,7 +143,10 @@ if model_pipeline is not None:
         
         try:
             # Predict using the loaded final scikit-learn pipeline
-            prediction = model_pipeline.predict(input_df)[0]
+            raw_prediction = model_pipeline.predict(input_df)[0]
+            
+            # FIX: Clip the prediction score to stay strictly between 0.0 and 10.0
+            prediction = np.clip(raw_prediction, 0.0, 10.0)
             
             # Show diagnostic alert outputs
             st.write("---")
